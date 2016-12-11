@@ -1,0 +1,12 @@
+[package]
+name = "wintermute"
+version = "0.1.0"
+authors = ["Ross Schulman <ross@rbs.io>"]
+
+[dependencies]
+websocket = "0.17.1"
+opus = "0.2.0"
+hound = "2.0.0"
+openssl = "0.7.6"
+byteorder = "0.5.3"
+gstreamer = "0.7.0"
