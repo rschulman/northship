@@ -1,21 +1,27 @@
 extern crate websocket;
 extern crate openssl;
 extern crate byteorder;
+extern crate serde;
+extern crate serde_json;
 //extern crate gst;
 
 use std::thread;
+use std::sync::mpsc::channel;
 use std::path::Path;
 use websocket::{Server, Message, Receiver};
 use websocket::message::Type;
 use openssl::ssl::{SslContext, SslMethod};
 use openssl::x509::X509FileType;
 use byteorder::{BigEndian, WriteBytesExt};
+use serde_json::Map;
 
 // struct Connection {
 //     sdp: String,
 //     gst_pipeline: String,
 //     pipeline: gst::Pipeline,
 // }
+
+// TODO: Change all printlns to log crate
 
 fn main() {
     let mut context = SslContext::new(SslMethod::Tlsv1).unwrap();
@@ -28,6 +34,7 @@ fn main() {
     println!("Server running...");
 
     for connection in server {
+        // TODO: Authentication should happen here.
         thread::spawn(move || {
             println!("New connection, processing...");
             let request = connection.unwrap().read_request().unwrap(); // Get the request
@@ -35,6 +42,28 @@ fn main() {
             let response = request.accept(); // Form a response
             let mut client = response.send().unwrap(); // Send the response
             let (mut sender, mut receiver) = client.split();
+            let (chan_rx, chan_tx) = channel();
+
+            thread::spawn(move || {
+                loop {
+                    // This thread's only job is to take from the channel,
+                    // form message into JSON, then send to the client.
+                    let message = chan_rx.recv();
+                    match message {
+                        Ok(send_string) => {
+                            let mut send_map = Map::new();
+                            send_map.insert("payload", send_string);
+                            sender.send(serde_json::to_string(&send_map).unwrap());
+                        }
+                        Err(err) => {
+                            // Means that the other side of the channel has dropped.
+                            // So, all of the channel senders have fallen out of scope.
+                            // In this case its safe to assume our job here is done.
+                            break;
+                        }
+                    }
+                }
+            });
 
             for message in receiver.incoming_messages() {
                 let message: Message = message.unwrap();
@@ -46,6 +75,18 @@ fn main() {
 
                     Type::Text => {
                         println!("{}", String::from_utf8_lossy(&message.payload));
+                        // Decode the JSON...
+                        let deserialized_msg::Map<String, String> =
+                                serde_json::from_str(&message.payload).unwrap();
+
+                        // First, get the payload of what was said on the other side.
+                        match deserialized_msg.pointer("/payload") {
+                            Some(speech) => {
+                                // Call into some mod for sending to tensorflow...
+                            }
+                            None() => println!("Got an unexpected JSON message. Dropping.");
+                        }
+
                         // // Decode JSON into something usable.
                         // // If type: sdp -> parse it into something gstreamer can use, send answer
                         // // If type: candidate -> Add candidate to list, try until connection?
