@@ -1,5 +1,3 @@
-mod connection;
-
 struct Connection {
     offer: String,
     mycandidates: Vec<Candidate>,
@@ -49,7 +47,7 @@ impl Connection {
                     // Ok, what else?
                     // process_sdp() has to eventually send an answer of some kind.
                     // and process_candidate has to populate some sort of candidate object?
-                    
+
 
                 }
 
@@ -57,7 +55,37 @@ impl Connection {
             }
         }
 
-        fn process_candidate(candidate_string: String) {
+        fn process_candidate(&self, candidate_string: String) {
+            let items = candidate_string.split(' ').collect();
+            let addr = if items[4].split('.').count() == 4 {
+                // This is an ipv4 address
+                SocketAddrV4::new(match Ipv4Addr::from_str(items[4]) {
+                                        Result(ip) => ip,
+                                        Err(e) => { error!("Malformed candidate string. Dropping.");
+                                                    return; }
+                                  }, items[5].parse::<u16>().unwrap())
+            } else {
+                // This is an ipv6 address
+                SocketAddrV6::new(match Ipv6Addr::from_str(items[4]) {
+                                        Result(ip) => ip,
+                                        Err(e) => { error!("Malformed candidate string. Dropping.");
+                                                    return; }
+                                  }, items[5].parse::<u16>().unwrap())
+            }
+
+            self.candidates.push( Candidate { items[0],
+                                              items[1].parse::<u8>().unwrap(),
+                                              match items[2] {
+                                                  "UDP" => Udp,
+                                                  "TCP" => Tcp,
+                                                  _ => { error!("Malformed candidate string. Dropping.");
+                                                         return; }
+                                              },
+                                              items[3].parse::<u32>().unwrap(),
+                                              SocketAddr(addr),
+                                              match items[6] { // Which type of connection?
+                                                  ""
+                                              }
 
     }
 }
@@ -71,5 +99,3 @@ struct Candidate {
     conn_type: ICEMethod,
     related_address: Option<SocketAddr>
 }
-
-
