@@ -1,19 +1,19 @@
 extern crate websocket;
 extern crate openssl;
-extern crate byteorder;
-extern crate serde;
 extern crate serde_json;
+//extern crate tensorflow;
+extern crate chrono;
 //extern crate gst;
 
 use std::thread;
 use std::sync::mpsc::channel;
 use std::path::Path;
-use websocket::{Server, Message, Receiver};
+use websocket::{Server, Message, Sender, Receiver};
 use websocket::message::Type;
 use openssl::ssl::{SslContext, SslMethod};
 use openssl::x509::X509FileType;
-use byteorder::{BigEndian, WriteBytesExt};
-use serde_json::Map;
+use serde_json::{Map, Value};
+
 
 // struct Connection {
 //     sdp: String,
@@ -42,7 +42,7 @@ fn main() {
             let response = request.accept(); // Form a response
             let mut client = response.send().unwrap(); // Send the response
             let (mut sender, mut receiver) = client.split();
-            let (chan_rx, chan_tx) = channel();
+            let (chan_tx, chan_rx) = channel::<String>();
 
             thread::spawn(move || {
                 loop {
@@ -53,9 +53,10 @@ fn main() {
                         Ok(send_string) => {
                             let mut send_map = Map::new();
                             send_map.insert("payload", send_string);
-                            sender.send(serde_json::to_string(&send_map).unwrap());
+                            let response = Message::text(serde_json::to_string(&send_map).unwrap());
+                            sender.send_message(&response);
                         }
-                        Err(err) => {
+                        Err(_) => {
                             // Means that the other side of the channel has dropped.
                             // So, all of the channel senders have fallen out of scope.
                             // In this case its safe to assume our job here is done.
@@ -71,20 +72,20 @@ fn main() {
                 match message.opcode {
                     Type::Binary => {
                         println!("Got binary blob.");
-                    }
+                    },
 
                     Type::Text => {
                         println!("{}", String::from_utf8_lossy(&message.payload));
                         // Decode the JSON...
-                        let deserialized_msg::Map<String, String> =
-                                serde_json::from_str(&message.payload).unwrap();
+                        let deserialized_msg: Value =
+                                serde_json::from_str(std::str::from_utf8(&message.payload).unwrap()).unwrap();
 
                         // First, get the payload of what was said on the other side.
                         match deserialized_msg.pointer("/payload") {
                             Some(speech) => {
                                 // Call into some mod for sending to tensorflow...
-                            }
-                            None() => println!("Got an unexpected JSON message. Dropping.");
+                            },
+                            None => println!("Got an unexpected JSON message. Dropping."),
                         }
 
                         // // Decode JSON into something usable.
@@ -110,7 +111,7 @@ fn main() {
                         // // and process_candidate has to populate some sort of candidate object?
 
 
-                    }
+                    },
 
                     _ => println!("Got other message.")
                 }
