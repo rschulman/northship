@@ -14,6 +14,7 @@ use openssl::ssl::{SslContext, SslMethod};
 use openssl::x509::X509FileType;
 use serde_json::{Map, Value};
 
+mod logic;
 
 // struct Connection {
 //     sdp: String,
@@ -68,6 +69,10 @@ fn main() {
 
             for message in receiver.incoming_messages() {
                 let message: Message = message.unwrap();
+    // get offset from client, convert to minutes.
+    // Then do UTC.noW().with_timezone()
+    //let dt = UTC::now().with_timezone(&FixedOffset::west(offset)); 
+
 
                 match message.opcode {
                     Type::Binary => {
