@@ -1,5 +1,27 @@
 use super::chrono::{UTC, DateTime, FixedOffset, NaiveTime};
 
+const owm_api_key: String = "88faf93052c74046d35a1b902dc19fd7";
+
+fn get_weather(long: f32, lat: f32) -> (String, u16, u16) {
+    let query =
+    format!("api.openweathermap.org/data/2.5/weather/daily?lat={lat}&lon={long}&APPID={apikey}&units=metric&cnt=3",
+            lat=lat,
+            long=long,
+            apikey=owm_api_key);
+
+    let client = Client::new();
+    let res = client.get(&query).send().ok();
+    let mut data = String::new();
+    res.read_to_string(&data).ok();
+    // TODO: Need to error check here. Can't panic whenever we get bad data.
+    let weather: Value = serde_json::from_str(&data).unwrap(); 
+    let weather_desc = weather.pointer("/list/0/weather/description").unwrap();
+    let weather_max = weather.pointer("/list/0/temp/max").unwrap();
+    let weather_min = weather.pointer("/list/0/temp/min").unwrap();
+    (weather_desc, weather_max, weather_min)
+
+}
+
 fn timegreeting(dt: DateTime<FixedOffset>) -> String {
     let comp = dt.naive_local().time();
     let dawn = NaiveTime::from_hms(05, 00, 00);
@@ -18,15 +40,18 @@ fn timegreeting(dt: DateTime<FixedOffset>) -> String {
     }
 }
 
-pub fn greeting (local_time: DateTime<FixedOffset>) -> String {
+pub fn greeting (local_time: DateTime<FixedOffset>, lat: f32, long: f32) -> String {
+    let weather = get_weather(lat, long); 
     format!("{timegreet}, {target_name}. Today is {date_string}. \
-             Today will be {weather}, with a high of {high_temp}.\
+             Today will be {weather}, with a high of {high_temp} degrees.\
+             And overnight lows of {low_temp} degrees.\
              You have {emails} new message{plural}, {importance_desc}.",
              timegreet = timegreeting(local_time),
              target_name = "Ross",
              date_string = local_time.format("%A, %B %e").to_string(),
-             weather = "sunny",
-             high_temp = "50 degrees",
+             weather = weather.0,
+             high_temp = weather.1,
+             low_temp = weather.2
              emails = "no",
              plural = "s",
              importance_desc = "you poor bastard"
