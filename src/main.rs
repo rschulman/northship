@@ -4,6 +4,7 @@ extern crate serde_json;
 //extern crate tensorflow;
 extern crate chrono;
 //extern crate gst;
+extern crate hyper;
 
 use std::thread;
 use std::sync::mpsc::channel;
@@ -13,6 +14,7 @@ use websocket::message::Type;
 use openssl::ssl::{SslContext, SslMethod};
 use openssl::x509::X509FileType;
 use serde_json::{Map, Value};
+use chrono::{DateTime, UTC, FixedOffset};
 
 mod logic;
 
@@ -69,10 +71,6 @@ fn main() {
 
             for message in receiver.incoming_messages() {
                 let message: Message = message.unwrap();
-    // get offset from client, convert to minutes.
-    // Then do UTC.noW().with_timezone()
-    //let dt = UTC::now().with_timezone(&FixedOffset::west(offset)); 
-
 
                 match message.opcode {
                     Type::Binary => {
@@ -88,6 +86,17 @@ fn main() {
                         // First, get the payload of what was said on the other side.
                         match deserialized_msg.pointer("/payload") {
                             Some(speech) => {
+                                let lat =
+                                    deserialized_msg.pointer("/lat").unwrap().as_f64().unwrap();;
+                                let long =
+                                    deserialized_msg.pointer("/long").unwrap().as_f64().unwrap();
+                                let mut tz =
+                                    deserialized_msg.pointer("/tz").unwrap().as_i64().unwrap();
+                                tz = tz * 60;
+                                let local_time = UTC::now().with_timezone(&FixedOffset::east(tz as
+                                                                                            i32));
+                                let reply = logic::greeting(local_time, lat as f32, long as f32);
+                                chan_tx.send(reply);
                                 // Call into some mod for sending to tensorflow...
                             },
                             None => println!("Got an unexpected JSON message. Dropping."),
