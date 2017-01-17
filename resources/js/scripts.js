@@ -6,7 +6,7 @@ socket.onopen = function (event) {
     var tz = d.getTimeZoneOffset();
     navigator.geolocation.getCurrentPosition().then(function(position){
         var greeting = {
-            payload: "Hey Northship."
+            payload: "Hey Northship.",
             lat: position.coords.latitude,
             long: position.coords.longitude,
             tz: tz
