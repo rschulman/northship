@@ -17,7 +17,8 @@ socket.onopen = function (event) {
 
 socket.onmessage = function (event) {
 // Append the payload to the conversation div.
-
+    var message = JSON.parse(event.data);
+    document.getElementById("conversation").append(message.payload);
 }
 
 window.onload = function () {
