@@ -11,12 +11,14 @@ socket.onopen = function (event) {
             long: position.coords.longitude,
             tz: tz
         };
+        socket.send(JSON.stringify(greeting));
     });
 
 }
 
 socket.onmessage = function (event) {
 // Append the payload to the conversation div.
+    console.log(event.data);
     var message = JSON.parse(event.data);
     document.getElementById("conversation").append(message.payload);
 }
