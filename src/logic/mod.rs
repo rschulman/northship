@@ -6,20 +6,36 @@ use std::str::FromStr;
 
 const OWM_API_KEY: &'static str = "88faf93052c74046d35a1b902dc19fd7";
 
-fn get_weather(long: f32, lat: f32) -> (String, i64, i64) {
+fn parse_owm_data(input: String) -> Weather {
+
+
+fn get_weather(lat: f32, long: f32) -> (String, i64, i64) {
     let query =
-    format!("api.openweathermap.org/data/2.5/weather/daily?lat={lat}&lon={long}&APPID={apikey}&units=metric&cnt=3",
+    format!("http://api.openweathermap.org/data/2.5/forecast/daily?lat={lat}&lon={long}&APPID={apikey}&units=metric&cnt=3",
             lat=lat,
             long=long,
             apikey=OWM_API_KEY);
 
     let client = Client::new();
-    let mut res = client.get(&query).send().ok().unwrap();
+    let mut res = match client.get(&query).send() {
+        Ok(data) => data,
+        Err(error) => panic!("HTTP request error: {}", error)
+    };
     let mut data = String::new();
-    res.read_to_string(&mut data).ok();
+    match res.read_to_string(&mut data) {
+        Ok(_) => (),
+        Err(err) => panic!("Could not read HTTP response: {}", err)
+    };
+    println!("{}", data);
     // TODO: Need to error check here. Can't panic whenever we get bad data.
-    let weather: Value = Value::from_str(&data).unwrap();
-    let weather_desc = weather.pointer("/list/0/weather/description").unwrap().as_str().unwrap();
+    let weather: Value = match Value::from_str(&data) {
+        Ok(data) => data,
+        Err(err) => panic!("Error parsing weather JSON: {}", err)
+    };
+    let weather_desc = match weather.pointer("/list/0/weather/0/description") {
+        Some(description) => description,
+        None => panic!("Failed to find weather description in JSON")
+    };
     let weather_max = weather.pointer("/list/0/temp/max").unwrap().as_i64().unwrap();
     let weather_min = weather.pointer("/list/0/temp/min").unwrap().as_i64().unwrap();
     (weather_desc.to_string(), weather_max, weather_min)
@@ -45,7 +61,9 @@ fn timegreeting(dt: DateTime<FixedOffset>) -> String {
 }
 
 pub fn greeting (local_time: DateTime<FixedOffset>, lat: f32, long: f32) -> String {
+    println!("Checking weather...");
     let weather = get_weather(lat, long);
+    println!("Survived weather.");
     format!("{timegreet}, {target_name}. Today is {date_string}. \
              Today will be {weather}, with a high of {high_temp} degrees.\
              And overnight lows of {low_temp} degrees.\
